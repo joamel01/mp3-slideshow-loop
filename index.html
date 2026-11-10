@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="sv" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MP3 Bildspels- & Loop-Filmgenerator (1–20 min Full HD Studio)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-color: #07090e;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #05070b;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 40px rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    input[type="range"] {
+      accent-color: #f59e0b;
+    }
+    .rec-pulse {
+      animation: pulseRec 1.2s infinite ease-in-out;
+    }
+    @keyframes pulseRec {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(1.15); }
+    }
+    .thumb-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+    .thumb-scroll::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 4px;
+    }
+    .thumb-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b]"></div>
+      <div>
+        <h1 class="text-base font-semibold tracking-tight text-slate-100">🎬 MP3 Bildspels- & Loop-Filmgenerator (1–20 min Studio)</h1>
+        <p class="text-xs text-slate-400">Välj bildkatalog + MP3 • Loopar Bild 1 → Bild 2 → Bild 3 → Bild 1... (ca 5s/bild) • 1920×1080 Full HD</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2.5 flex-wrap">
+      <!-- Intro / Start Image Picker -->
+      <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/40 transition" title="Välj en separat startbild som bara visas en gång i början på filmen">
+        <span>🎬 Välj Startbild</span>
+        <input id="introImageInput" type="file" accept="image/*" class="hidden" />
+      </label>
+
+      <!-- Image Folder Picker -->
+      <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 transition" title="Välj en hel mapp/filkatalog med bilder på din dator">
+        <span>📂 Välj Bildmapp (Katalog)</span>
+        <input id="folderInput" type="file" webkitdirectory directory multiple class="hidden" />
+      </label>
+
+      <!-- Multi Image Picker (Fallback / Add more images) -->
+      <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium border border-slate-700 transition" title="Välj en eller flera bildfiler direkt">
+        <span>🖼️ Välj Bilder</span>
+        <input id="imagesInput" type="file" accept="image/*" multiple class="hidden" />
+      </label>
+
+      <!-- MP3 File Picker -->
+      <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium border border-slate-700 transition">
+        <span>🎵 Välj MP3-fil</span>
+        <input id="audioInput" type="file" accept="audio/*" class="hidden" />
+      </label>
+
+      <!-- Record Full Video + MP3 -->
+      <button id="btnRecordWithAudio" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-semibold shadow-lg shadow-amber-500/20 transition">
+        <span id="recDot" class="w-2 h-2 rounded-full bg-red-600"></span>
+        <span id="recBtnText">Spela in Video + MP3 (11 min)</span>
+      </button>
+
+      <!-- Record Loop Without Audio -->
+      <button id="btnRecordLoop" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition" title="Exporterar bildspelsloopen utan ljud">
+        <span id="btnLoopText">🔁 Exportera Utan Ljud</span>
+      </button>
+
+      <!-- Fullscreen -->
+      <button id="btnFullscreen" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 transition">
+        <span>⛶ Helskärm</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- Left / Center: 16:9 Canvas Stage + Thumbnail Strip + Audio Bar -->
+    <div class="lg:col-span-8 xl:col-span-9 flex flex-col gap-4">
+      <div id="canvasContainer" class="canvas-wrapper">
+        <canvas id="sceneCanvas" width="1920" height="1080"></canvas>
+
+        <!-- Current Slide Status Pill (Not recorded onto canvas!) -->
+        <div class="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-200 pointer-events-none">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="slideStatusOverlay">Bild 1 av 5 • Visas i 5.0s • Loopar sömlöst</span>
+        </div>
+
+        <!-- Recording Status Overlay (Not recorded onto canvas!) -->
+        <div id="recOverlay" class="hidden absolute top-4 left-4 bg-slate-950/85 backdrop-blur-md border border-red-500/40 rounded-lg px-3.5 py-2 flex items-center gap-3 text-xs text-slate-100 shadow-xl pointer-events-none">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 rec-pulse"></span>
+          <div>
+            <div id="recStatusTitle" class="font-semibold text-red-300">Spelar in 1080p-bildspel + MP3...</div>
+            <div id="recStatusTimer" class="text-slate-400 font-mono">00:00 / 11:00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loaded Folder & Image Sequence Strip -->
+      <div id="dropZone" class="bg-slate-900/85 border border-slate-800 rounded-xl p-4 space-y-3 transition">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <span class="text-xs font-semibold text-amber-400" id="folderTitleLabel">📂 Aktuell bildsekvens (5 demobilder — välj en bildmapp eller dra & släpp bilder här)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnSortName" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition" title="Sortera bilderna i naturlig namn-/nummerordning (bild1, bild2, bild3...)">
+              🔢 Sortera (1, 2, 3...)
+            </button>
+            <button id="btnShuffle" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition" title="Slumpa ordningen på bilderna">
+              🔀 Blanda ordning
+            </button>
+          </div>
+        </div>
+
+        <!-- Horizontal Thumbnail Strip -->
+        <div id="thumbStrip" class="thumb-scroll flex items-center gap-3 overflow-x-auto pb-2 pt-1"></div>
+      </div>
+
+      <!-- Audio Player & Status Bar -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button id="btnPlayAudio" class="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center font-bold hover:bg-amber-500/30 transition">
+            ▶
+          </button>
+          <div class="min-w-0 flex-1">
+            <div id="audioFileName" class="text-xs font-medium text-amber-300 truncate">🎵 Förladdad: Neon After Rain (Extended Version).mp3</div>
+            <div id="audioTimeDisplay" class="text-xs text-slate-400 font-mono mt-0.5">00:00 / 11:09</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 w-full sm:w-auto justify-end flex-wrap">
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input id="chkAutoMatchMp3" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+            <span>Matcha längd automatiskt vid byte av MP3</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input id="chkLoopAudio" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+            <span>Repetera MP3 om videon är längre än låten</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input id="chkShowVisualizer" type="checkbox" class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+            <span>Visa diskret ljudvåg</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Download & Video Preview Box (Appears when recording finishes) -->
+      <div id="downloadResultBox" class="hidden bg-emerald-950/60 border border-emerald-500/40 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="text-sm font-semibold text-emerald-300">✅ Din inspelade bildspelsvideo (Bild + MP3-ljud) är klar!</div>
+          <p class="text-xs text-slate-300">Videofilen har fått samma namn som din MP3-fil. Klicka på knappen om nedladdningen inte startade automatiskt.</p>
+        </div>
+        <a id="downloadResultLink" href="#" download="slideshow-video.webm" class="px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs whitespace-nowrap shadow-lg transition">
+          ⬇ Ladda ner Videofil (Bild + Ljud)
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Customization Controls -->
+    <aside class="lg:col-span-4 xl:col-span-3 bg-slate-900/85 border border-slate-800 rounded-xl p-5 space-y-5">
+      <div>
+        <h2 class="text-sm font-semibold text-slate-100">Bildspels- & Loop-inställningar</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Anpassa startbild, visningstid per bild, övergångar och total videolängd efter musiken.</p>
+      </div>
+
+      <!-- Optional Intro / Start Image Card (Shown once at the beginning of the video) -->
+      <div class="bg-slate-950/90 border border-emerald-500/30 rounded-xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-emerald-300">🎬 Startbild (Visas 1 gång i början)</span>
+          <span id="valIntroSec" class="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">6.0 sek</span>
+        </div>
+
+        <!-- Intro Image Status / Thumbnail Box -->
+        <div class="flex items-center justify-between gap-2 bg-slate-900/90 border border-slate-800 rounded-lg p-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div id="introThumbBox" class="w-14 h-8 rounded bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center text-xs text-slate-500">
+              Ingen
+            </div>
+            <div class="min-w-0">
+              <div id="introFileName" class="text-xs font-medium text-slate-300 truncate">Ingen startbild vald</div>
+              <div id="introSubStatus" class="text-xs text-slate-400">Filmen startar direkt med Bild 1</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button id="btnRestartFromIntro" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-amber-300 border border-slate-700 transition" title="Starta om förhandsvisningen från 00:00 (Startbilden)">
+              ⏮ 00:00
+            </button>
+            <button id="btnClearIntro" class="hidden px-2 py-1 rounded bg-red-950/80 hover:bg-red-900 text-xs text-red-300 border border-red-500/30 transition" title="Ta bort startbild">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs text-slate-300">
+            <span>Visningstid för Startbild</span>
+          </div>
+          <input id="rngIntroSec" type="range" min="1" max="30" step="0.5" value="6" class="w-full" />
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span>1s</span>
+            <span>6s</span>
+            <span>15s</span>
+            <span>30s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide Duration (Default 5 seconds per image) -->
+      <div class="bg-slate-950/90 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-amber-300">🖼️ Visningstid per bild</span>
+          <span id="valSlideSec" class="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">5.0 sek</span>
+        </div>
+        <input id="rngSlideSec" type="range" min="1" max="15" step="0.5" value="5" class="w-full" />
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>1s</span>
+          <span>5s (Standard)</span>
+          <span>10s</span>
+          <span>15s</span>
+        </div>
+        <p id="cycleSummaryText" class="text-xs text-slate-400 leading-relaxed">
+          Varje bild visas i <strong>5.0 sekunder</strong> och loopar sedan om: <em>Bild 1 → Bild 2 → Bild 3 → Bild 1...</em>
+        </p>
+      </div>
+
+      <!-- Total Video / Loop Duration (1 - 20 min + Match MP3) -->
+      <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-200">⏱ Total Videolängd (1–20 min)</span>
+          <span id="valDurationMinutes" class="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">11 min</span>
+        </div>
+        <input id="rngDurationMinutes" type="range" min="1" max="20" step="1" value="11" class="w-full" />
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>1 min</span>
+          <span>5 min</span>
+          <span>10 min</span>
+          <span>15 min</span>
+          <span>20 min</span>
+        </div>
+        <div class="pt-1">
+          <button id="btnMatchMp3" class="w-full py-1.5 px-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-xs font-medium text-amber-300 border border-amber-500/40 transition">
+            🎯 Matcha exakt MP3-längd (11:10)
+          </button>
+        </div>
+      </div>
+
+      <!-- Transition Style -->
+      <div class="space-y-1.5">
+        <label class="text-xs font-medium text-amber-400 block">✨ Övergång mellan bilder</label>
+        <select id="selTransition" class="w-full bg-slate-950 border border-amber-500/40 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-400">
+          <option value="crossfade" selected>1. Mjuk Övertoning (Crossfade)</option>
+          <option value="slide">2. Mjuk Glidning (Slide Left)</option>
+          <option value="zoom">3. Filmisk Zoom-övertoning</option>
+          <option value="cut">4. Direkt Klipp (Utan övertoning)</option>
+        </select>
+      </div>
+
+      <!-- Image Fit Mode -->
+      <div class="space-y-1.5">
+        <label class="text-xs font-medium text-slate-300 block">📐 Bildpassning (1920×1080 Full HD)</label>
+        <select id="selFitMode" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+          <option value="contain_blur" selected>Visa hela bilden + Suddig matchande bakgrund (Ingen beskärning)</option>
+          <option value="cover">Fyll hela 16:9-skärmen (Beskär kanter vid behov)</option>
+          <option value="contain_black">Visa hela bilden mot mörk biobakgrund</option>
+        </select>
+      </div>
+
+      <!-- Atmosphere / Particle Overlay -->
+      <div class="space-y-1.5">
+        <label class="text-xs font-medium text-slate-300 block">🌟 Valfritt Atmosfäriskt Överlägg</label>
+        <select id="selOverlayEffect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+          <option value="none">Ingen effekt (Endast dina bilder)</option>
+          <option value="bokeh" selected>✨ Gyllene Ljuspartiklar & Varm Bokeh</option>
+          <option value="petals">🌹 Romantiska Svängande Rosblad (Bröllop/Romantik)</option>
+          <option value="confetti">🎉 Festkonfetti & Glittrande Stjärnor</option>
+          <option value="rain">🌧️ Stämningsfullt Nattregn (Noir)</option>
+        </select>
+      </div>
+
+      <!-- Sliders for Transition Duration & Ken Burns Zoom -->
+      <div class="space-y-3 pt-2 border-t border-slate-800/80">
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Övergångstid (Crossfade/Slide)</span>
+            <span id="valTransSec" class="text-slate-400 font-mono">0.9 sek</span>
+          </div>
+          <input id="rngTransSec" type="range" min="0.2" max="2.5" step="0.1" value="0.9" class="w-full" />
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Ken Burns-effekt (Mjuk kamerazoom)</span>
+            <span id="valKenBurns" class="text-slate-400 font-mono">100%</span>
+          </div>
+          <input id="rngKenBurns" type="range" min="0" max="200" step="10" value="100" class="w-full" />
+        </div>
+      </div>
+
+      <!-- Checkboxes -->
+      <div class="space-y-2.5 pt-2 border-t border-slate-800/80 text-xs text-slate-300">
+        <label class="flex items-center gap-2.5 cursor-pointer">
+          <input id="chkAudioReactive" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+          <span>Ljudreaktivt sken i takt med musiken</span>
+        </label>
+        <label class="flex items-center gap-2.5 cursor-pointer">
+          <input id="chkVignette" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+          <span>Cinematic vinjett runt kanterna</span>
+        </label>
+        <label class="flex items-center gap-2.5 cursor-pointer">
+          <input id="chkShowCounter" type="checkbox" class="rounded border-slate-700 bg-slate-800 text-amber-500" />
+          <span>Visa bildens filnamn diskret i videon</span>
+        </label>
+      </div>
+
+      <!-- Optional Song Title Overlay on Video -->
+      <div class="space-y-1.5 pt-2 border-t border-slate-800/80">
+        <label class="text-xs font-medium text-slate-300 block">Valfri låttitel / text i videon</label>
+        <input id="inpOverlayText" type="text" placeholder="T.ex. Sommarminnen — Bossa & Fest" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // =========================================================================
+    // MP3 SLIDESHOW & LOOPING FILM GENERATOR ENGINE (1920x1080 Full HD)
+    // =========================================================================
+    const canvas = document.getElementById('sceneCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = 1920;
+    const H = 1080;
+
+    const state = {
+      introSlide: null,         // Optional start image { name, img, thumbUrl } shown once at 00:00
+      introDurationSec: 6.0,    // Adjustable duration (1 - 30s) for the start image
+      slideDurationSec: 5.0,    // Default ~5 seconds per looping image
+      transitionSec: 0.9,       // Smooth transition duration
+      durationSec: 11 * 60,     // Total video duration (adjustable 1-20 min or matched to MP3)
+      transitionType: 'crossfade',
+      fitMode: 'contain_blur',
+      overlayEffect: 'bokeh',
+      kenBurnsAmount: 1.0,
+      audioReactive: true,
+      showVisualizer: false,
+      showVignette: true,
+      showCaption: false,
+      overlayText: ''
+    };
+
+    // Array of loaded slides: { id, name, canvasOrImg, thumbUrl, isDemo }
+    let slides = [];
+
+    // Generate 5 rich, atmospheric demo slides at startup so the 5s loop is immediately visible
+    function createDemoSlides() {
+      const demos = [
+        { title: 'Bild 1 — Tropisk Solnedgång & Bossa Nova', c1: '#0c4a6e', c2: '#f97316', c3: '#fde047', accent: '#2dd4bf', icon: '🌴☀️' },
+        { title: 'Bild 2 — Romantiskt Bröllop & Blomsterbågar', c1: '#1e1026', c2: '#831843', c3: '#f472b6', accent: '#fef08a', icon: '💍🌸' },
+        { title: 'Bild 3 — Takfest, Skybar & Champagne', c1: '#0f0722', c2: '#4c1d95', c3: '#ec4899', accent: '#38bdf8', icon: '🥂🎉' },
+        { title: 'Bild 4 — Neon Noir Nattstad i Regn', c1: '#04060b', c2: '#0f172a', c3: '#1e293b', accent: '#f59e0b', icon: '🌧️🌆' },
+        { title: 'Bild 5 — Rio de Janeiro & Copacabana', c1: '#064e3b', c2: '#0d9488', c3: '#fef08a', accent: '#fb7185', icon: '🏖️🎸' }
+      ];
+
+      slides = demos.map((d, idx) => {
+        const off = document.createElement('canvas');
+        off.width = 1920;
+        off.height = 1080;
+        const oCtx = off.getContext('2d');
+
+        const g = oCtx.createLinearGradient(0, 0, 1920, 1080);
+        g.addColorStop(0, d.c1);
+        g.addColorStop(0.55, d.c2);
+        g.addColorStop(1, d.c3);
+        oCtx.fillStyle = g;
+        oCtx.fillRect(0, 0, 1920, 1080);
+
+        // Decorative glowing sun / bokeh circles
+        for (let i = 0; i < 18; i++) {
+          const rx = (i * 293 + idx * 140) % 1920;
+          const ry = (i * 167 + idx * 90) % 1080;
+          const rad = 40 + (i % 5) * 45;
+          const rg = oCtx.createRadialGradient(rx, ry, 4, rx, ry, rad);
+          rg.addColorStop(0, d.accent);
+          rg.addColorStop(1, 'rgba(255,255,255,0)');
+          oCtx.fillStyle = rg;
+          oCtx.globalAlpha = 0.28;
+          oCtx.beginPath();
+          oCtx.arc(rx, ry, rad, 0, Math.PI * 2);
+          oCtx.fill();
+        }
+        oCtx.globalAlpha = 1.0;
+
+        // Silhouette horizon
+        oCtx.fillStyle = 'rgba(5, 8, 18, 0.55)';
+        oCtx.fillRect(0, 820, 1920, 260);
+
+        // Demo text card
+        oCtx.fillStyle = 'rgba(10, 14, 26, 0.55)';
+        oCtx.beginPath();
+        oCtx.roundRect(260, 320, 1400, 360, 28);
+        oCtx.fill();
+        oCtx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        oCtx.lineWidth = 3;
+        oCtx.stroke();
+
+        oCtx.textAlign = 'center';
+        oCtx.fillStyle = '#fef08a';
+        oCtx.font = 'bold 64px system-ui, sans-serif';
+        oCtx.fillText(`${d.icon}  ${d.title}`, 960, 480);
+
+        oCtx.fillStyle = '#e2e8f0';
+        oCtx.font = '400 34px system-ui, sans-serif';
+        oCtx.fillText('Klicka på "📂 Välj Bildmapp (Katalog)" ovan för att ladda dina egna bilder!', 960, 565);
+
+        return {
+          id: `demo-${idx}`,
+          name: `${d.title}.jpg`,
+          img: off,
+          thumbUrl: off.toDataURL('image/jpeg', 0.6),
+          isDemo: true
+        };
+      });
+
+      renderThumbnails();
+      updateCycleSummary();
+    }
+
+    // Natural sort helper so bild1, bild2, bild10 are ordered 1, 2, 10
+    function sortSlidesNaturally() {
+      slides.sort((a, b) => a.name.localeCompare(b.name, 'sv', { numeric: true, sensitivity: 'base' }));
+      renderThumbnails();
+    }
+
+    function shuffleSlides() {
+      for (let i = slides.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [slides[i], slides[j]] = [slides[j], slides[i]];
+      }
+      renderThumbnails();
+    }
+
+    async function loadFilesIntoSlides(fileList, folderNameHint = '') {
+      const validImageExts = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
+      const imageFiles = Array.from(fileList).filter(f => f.type.startsWith('image/') || validImageExts.test(f.name));
+
+      if (imageFiles.length === 0) {
+        return;
+      }
+
+      // Sort naturally by filename (bild1, bild2, bild3...)
+      imageFiles.sort((a, b) => a.name.localeCompare(b.name, 'sv', { numeric: true, sensitivity: 'base' }));
+
+      const loadedSlides = [];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const url = URL.createObjectURL(file);
+        try {
+          const img = await new Promise((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = reject;
+            el.src = url;
+          });
+          loadedSlides.push({
+            id: `img-${Date.now()}-${i}`,
+            name: file.name,
+            img,
+            thumbUrl: url,
+            isDemo: false
+          });
+        } catch (err) {
+          console.warn('Kunde inte läsa bild:', file.name);
+        }
+      }
+
+      if (loadedSlides.length > 0) {
+        slides = loadedSlides;
+        const folderRel = imageFiles[0].webkitRelativePath
+          ? imageFiles[0].webkitRelativePath.split('/')[0]
+          : folderNameHint;
+        const label = document.getElementById('folderTitleLabel');
+        label.textContent = folderRel
+          ? `📂 Katalog: "${folderRel}" (${slides.length} bilder i loop)`
+          : `🖼️ Valda bilder (${slides.length} bilder i loop)`;
+
+        startTime = performance.now();
+        renderThumbnails();
+        updateCycleSummary();
+      }
+    }
+
+    function renderThumbnails() {
+      const strip = document.getElementById('thumbStrip');
+      strip.innerHTML = '';
+      slides.forEach((s, idx) => {
+        const item = document.createElement('div');
+        item.id = `thumb-card-${idx}`;
+        item.className = 'relative group flex-shrink-0 w-32 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 cursor-pointer transition hover:border-amber-400';
+        item.innerHTML = `
+          <div class="aspect-video w-full bg-slate-900 overflow-hidden">
+            <img src="${s.thumbUrl}" alt="${s.name}" class="w-full h-full object-cover" />
+          </div>
+          <div class="px-2 py-1 flex items-center justify-between gap-1 bg-slate-950/90">
+            <span class="text-xs font-mono font-semibold text-amber-400">#${idx + 1}</span>
+            <span class="text-xs text-slate-300 truncate" title="${s.name}">${s.name}</span>
+          </div>
+        `;
+        // Clicking a thumbnail jumps preview to that image in the loop
+        item.addEventListener('click', () => {
+          const introOffset = (state.introSlide && state.introSlide.img) ? state.introDurationSec : 0;
+          const targetOffsetSec = introOffset + idx * state.slideDurationSec;
+          startTime = performance.now() - targetOffsetSec * 1000;
+        });
+        strip.appendChild(item);
+      });
+    }
+
+    function updateCycleSummary() {
+      const count = slides.length;
+      const totalCycle = (count * state.slideDurationSec).toFixed(1);
+      const introPrefix = (state.introSlide && state.introSlide.img)
+        ? `<strong>Startbild (${state.introDurationSec.toFixed(1)}s)</strong> visas först en gång, följt av `
+        : '';
+      document.getElementById('cycleSummaryText').innerHTML =
+        `${introPrefix}<strong>${count} bilder</strong> × <strong>${state.slideDurationSec.toFixed(1)}s</strong> = en grundloop på <strong>${totalCycle}s</strong> som repeteras sömlöst (<em>Bild 1 → Bild 2 → ... → Bild 1</em>) under hela låtens längd.`;
+    }
+
+    // Helper: Draw an image onto the 1920x1080 canvas with selected fit mode & Ken Burns effect
+    function drawSlideImage(targetCtx, slideObj, progress01, alpha = 1, offsetX = 0, extraScale = 1) {
+      if (!slideObj || !slideObj.img) return;
+      const img = slideObj.img;
+      const iw = img.naturalWidth || img.width || 1920;
+      const ih = img.naturalHeight || img.height || 1080;
+
+      targetCtx.save();
+      targetCtx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      if (offsetX !== 0) {
+        targetCtx.translate(offsetX, 0);
+      }
+
+      // Ken Burns gentle pan & zoom (alternating zoom-in / zoom-out per image)
+      const kbZoom = 1 + (0.08 * state.kenBurnsAmount) * progress01;
+      const totalScale = kbZoom * extraScale;
+      const kbPanX = (progress01 - 0.5) * 32 * state.kenBurnsAmount;
+      const kbPanY = (progress01 - 0.5) * 18 * state.kenBurnsAmount;
+
+      if (state.fitMode === 'contain_blur') {
+        // 1. Blurred ambient background filling 1920x1080
+        const coverScale = Math.max(W / iw, H / ih) * 1.12;
+        const bw = iw * coverScale;
+        const bh = ih * coverScale;
+        targetCtx.save();
+        targetCtx.filter = 'blur(36px) brightness(0.52) saturate(1.25)';
+        targetCtx.drawImage(img, (W - bw) * 0.5, (H - bh) * 0.5, bw, bh);
+        targetCtx.restore();
+
+        // 2. Sharp foreground image (contain + Ken Burns)
+        const containScale = Math.min(W / iw, H / ih) * totalScale;
+        const fw = iw * containScale;
+        const fh = ih * containScale;
+        const fx = (W - fw) * 0.5 + kbPanX;
+        const fy = (H - fh) * 0.5 + kbPanY;
+
+        targetCtx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        targetCtx.shadowBlur = 35;
+        targetCtx.drawImage(img, fx, fy, fw, fh);
+        targetCtx.shadowBlur = 0;
+      } else if (state.fitMode === 'contain_black') {
+        targetCtx.fillStyle = '#05070b';
+        targetCtx.fillRect(0, 0, W, H);
+        const containScale = Math.min(W / iw, H / ih) * totalScale;
+        const fw = iw * containScale;
+        const fh = ih * containScale;
+        targetCtx.drawImage(img, (W - fw) * 0.5 + kbPanX, (H - fh) * 0.5 + kbPanY, fw, fh);
+      } else {
+        // Cover mode (fills entire 1920x1080)
+        const coverScale = Math.max(W / iw, H / ih) * totalScale;
+        const fw = iw * coverScale;
+        const fh = ih * coverScale;
+        targetCtx.drawImage(img, (W - fw) * 0.5 + kbPanX, (H - fh) * 0.5 + kbPanY, fw, fh);
+      }
+
+      targetCtx.restore();
+    }
+
+    // Atmospheric Particles (Bokeh, Rose Petals, Confetti, Rain)
+    const particles = Array.from({ length: 85 }, (_, i) => ({
+      x: (i * 197) % W,
+      y: (i * 131) % H,
+      r: 3 + (i % 6) * 3.5,
+      speedY: 22 + (i % 5) * 14,
+      speedX: -15 + (i % 7) * 5,
+      phase: (i * 0.43) % (Math.PI * 2)
+    }));
+
+    function drawOverlayEffects(timeSec, bass) {
+      const mode = state.overlayEffect;
+      if (mode === 'none') return;
+
+      ctx.save();
+      if (mode === 'bokeh') {
+        const cols = ['#fef08a', '#fbbf24', '#f472b6', '#38bdf8', '#fffbeb'];
+        for (let i = 0; i < 45; i++) {
+          const p = particles[i];
+          const px = ((p.x + Math.sin(timeSec * 0.6 + p.phase) * 45) % W + W) % W;
+          const py = ((p.y - timeSec * p.speedY * 0.6) % H + H) % H;
+          const rad = p.r * (1.8 + bass * 0.8);
+          const g = ctx.createRadialGradient(px, py, 1, px, py, rad * 2.4);
+          g.addColorStop(0, cols[i % cols.length]);
+          g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = g;
+          ctx.globalAlpha = 0.25 + 0.2 * Math.sin(timeSec * 2 + p.phase);
+          ctx.beginPath();
+          ctx.arc(px, py, rad * 2.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (mode === 'petals') {
+        const petalCols = ['#fda4af', '#ffffff', '#fb7185', '#fef08a', '#fbcfe8'];
+        for (let i = 0; i < 42; i++) {
+          const p = particles[i];
+          const px = ((p.x - timeSec * 24 + Math.sin(timeSec * 1.8 + p.phase) * 28) % W + W) % W;
+          const py = ((p.y + timeSec * (32 + (i % 4) * 10)) % H + H) % H;
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(timeSec * 1.4 + p.phase);
+          ctx.fillStyle = petalCols[i % petalCols.length];
+          ctx.globalAlpha = 0.78;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      } else if (mode === 'confetti') {
+        const confCols = ['#fde047', '#f43f5e', '#2dd4bf', '#a855f7', '#38bdf8', '#fb923c'];
+        for (let i = 0; i < 48; i++) {
+          const p = particles[i];
+          const px = ((p.x + Math.sin(timeSec * 2.2 + p.phase) * 32) % W + W) % W;
+          const py = ((p.y + timeSec * (44 + (i % 4) * 14)) % H + H) % H;
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(timeSec * 2.5 + p.phase);
+          ctx.fillStyle = confCols[i % confCols.length];
+          ctx.globalAlpha = 0.82;
+          ctx.fillRect(-5, -3, 10, 6);
+          ctx.restore();
+        }
+      } else if (mode === 'rain') {
+        ctx.strokeStyle = 'rgba(195, 220, 250, 0.34)';
+        ctx.lineWidth = 1.6;
+        for (let i = 0; i < 85; i++) {
+          const p = particles[i];
+          const rx = ((p.x - timeSec * 240) % W + W) % W;
+          const ry = ((p.y + timeSec * (1100 + (i % 3) * 250)) % H + H) % H;
+          ctx.beginPath();
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - 6, ry + 32);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // Web Audio API Setup
+    let audioCtx = null;
+    let audioElement = new Audio('audio.mp3');
+    audioElement.preload = 'metadata';
+    audioElement.loop = true;
+    let audioSourceNode = null, analyserNode = null, mediaStreamDest = null;
+    let freqData = new Uint8Array(64), currentBassEnergy = 0;
+
+    function initAudioGraph() {
+      if (audioCtx) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+      audioSourceNode = audioCtx.createMediaElementSource(audioElement);
+      analyserNode = audioCtx.createAnalyser();
+      analyserNode.fftSize = 128;
+      analyserNode.smoothingTimeConstant = 0.82;
+      mediaStreamDest = audioCtx.createMediaStreamDestination();
+      audioSourceNode.connect(analyserNode);
+      analyserNode.connect(audioCtx.destination);
+      analyserNode.connect(mediaStreamDest);
+      freqData = new Uint8Array(analyserNode.frequencyBinCount);
+    }
+
+    function getAudioEnergy() {
+      if (!analyserNode || audioElement.paused) {
+        currentBassEnergy *= 0.9;
+        return currentBassEnergy;
+      }
+      analyserNode.getByteFrequencyData(freqData);
+      let sum = 0;
+      for (let i = 0; i < 10; i++) sum += freqData[i];
+      currentBassEnergy = currentBassEnergy * 0.75 + (sum / (10 * 255)) * 0.25;
+      return currentBassEnergy;
+    }
+
+    let lastHighlightedIdx = -1;
+
+    function renderScene(elapsedSec) {
+      const safeTime = Math.max(0, elapsedSec);
+      const count = slides.length;
+      if (count === 0) return;
+
+      const hasIntro = Boolean(state.introSlide && state.introSlide.img);
+      const introDur = hasIntro ? Math.max(1.0, state.introDurationSec) : 0;
+      const slideDur = Math.max(1.0, state.slideDurationSec);
+      const transDur = state.transitionType === 'cut'
+        ? 0
+        : Math.min((hasIntro ? Math.min(slideDur, introDur) : slideDur) * 0.45, state.transitionSec);
+      const totalCycleSec = count * slideDur;
+      const totalLife = slideDur + transDur;
+
+      const bass = state.audioReactive ? getAudioEnergy() : 0;
+      ctx.clearRect(0, 0, W, H);
+
+      let activeCaptionText = '';
+
+      // =======================================================================
+      // 1. INTRO / START IMAGE PHASE (Shown ONLY ONCE at the very beginning)
+      // =======================================================================
+      if (hasIntro && safeTime < introDur) {
+        if (lastHighlightedIdx !== -2) {
+          lastHighlightedIdx = -2;
+          slides.forEach((_, idx) => {
+            const card = document.getElementById(`thumb-card-${idx}`);
+            if (card) card.classList.remove('ring-2', 'ring-amber-400', 'border-amber-400');
+          });
+        }
+
+        const introRemain = Math.max(0, introDur - safeTime);
+        document.getElementById('slideStatusOverlay').textContent =
+          `🎬 Startbild (${state.introSlide.name}) • Visas endast i början • ${introRemain.toFixed(1)}s kvar till Bild 1`;
+
+        const introProg01 = Math.max(0, Math.min(1, safeTime / introDur));
+        const inIntroTransition = (transDur > 0) && (safeTime >= introDur - transDur);
+        const tRaw = inIntroTransition ? (safeTime - (introDur - transDur)) / Math.max(0.05, transDur) : 0;
+        const tEase = tRaw * tRaw * (3 - 2 * tRaw);
+
+        if (!inIntroTransition) {
+          drawSlideImage(ctx, state.introSlide, introProg01, 1.0, 0, 1.0);
+        } else {
+          // Seamless handoff into Bild 1 (slides[0]) so Bild 1 has zero zoom jump when intro finishes!
+          const firstSlideProg01 = (count > 1)
+            ? ((safeTime - (introDur - transDur)) / totalLife)
+            : 0;
+          if (state.transitionType === 'crossfade') {
+            drawSlideImage(ctx, state.introSlide, introProg01, 1.0, 0, 1.0);
+            drawSlideImage(ctx, slides[0], firstSlideProg01, tEase, 0, 1.0);
+          } else if (state.transitionType === 'slide') {
+            drawSlideImage(ctx, state.introSlide, introProg01, 1.0, -tEase * W, 1.0);
+            drawSlideImage(ctx, slides[0], firstSlideProg01, 1.0, (1 - tEase) * W, 1.0);
+          } else if (state.transitionType === 'zoom') {
+            drawSlideImage(ctx, state.introSlide, introProg01, 1 - tEase, 0, 1.0 + tEase * 0.14);
+            drawSlideImage(ctx, slides[0], firstSlideProg01, tEase, 0, 1.0);
+          }
+        }
+        activeCaptionText = `Startbild • ${state.introSlide.name.replace(/\.[^/.]+$/, '')}`;
+      } else {
+        // =====================================================================
+        // 2. LOOPING SLIDESHOW PHASE (Bild 1 -> Bild 2 -> Bild 3 -> Bild 1...)
+        // =====================================================================
+        const loopElapsed = Math.max(0, safeTime - introDur);
+        const cycleTime = loopElapsed % totalCycleSec;
+        const currentIdx = Math.floor(cycleTime / slideDur) % count;
+        const nextIdx = (currentIdx + 1) % count;
+        const timeInSlide = cycleTime - currentIdx * slideDur;
+
+        // Continuous lifetime progress (from start of fade-in to end of fade-out) so zoom/pan never jumps!
+        const currentProg01 = (count > 1) ? ((transDur + timeInSlide) / totalLife) : (timeInSlide / slideDur);
+
+        if (currentIdx !== lastHighlightedIdx) {
+          lastHighlightedIdx = currentIdx;
+          slides.forEach((_, idx) => {
+            const card = document.getElementById(`thumb-card-${idx}`);
+            if (card) {
+              if (idx === currentIdx) {
+                card.classList.add('ring-2', 'ring-amber-400', 'border-amber-400');
+              } else {
+                card.classList.remove('ring-2', 'ring-amber-400', 'border-amber-400');
+              }
+            }
+          });
+        }
+        document.getElementById('slideStatusOverlay').textContent =
+          `Bild ${currentIdx + 1} av ${count} (${slides[currentIdx].name}) • ${(slideDur - timeInSlide).toFixed(1)}s kvar till Bild ${nextIdx + 1}`;
+
+        const inTransition = (transDur > 0) && (timeInSlide >= slideDur - transDur) && (count > 1);
+        const tRaw = inTransition ? (timeInSlide - (slideDur - transDur)) / Math.max(0.05, transDur) : 0;
+        const tEase = tRaw * tRaw * (3 - 2 * tRaw);
+
+        if (!inTransition) {
+          drawSlideImage(ctx, slides[currentIdx], currentProg01, 1.0, 0, 1.0);
+        } else {
+          const nextProg01 = (timeInSlide - (slideDur - transDur)) / totalLife;
+          if (state.transitionType === 'crossfade') {
+            drawSlideImage(ctx, slides[currentIdx], currentProg01, 1.0, 0, 1.0);
+            drawSlideImage(ctx, slides[nextIdx], nextProg01, tEase, 0, 1.0);
+          } else if (state.transitionType === 'slide') {
+            drawSlideImage(ctx, slides[currentIdx], currentProg01, 1.0, -tEase * W, 1.0);
+            drawSlideImage(ctx, slides[nextIdx], nextProg01, 1.0, (1 - tEase) * W, 1.0);
+          } else if (state.transitionType === 'zoom') {
+            drawSlideImage(ctx, slides[currentIdx], currentProg01, 1 - tEase, 0, 1.0 + tEase * 0.14);
+            drawSlideImage(ctx, slides[nextIdx], nextProg01, tEase, 0, 1.0);
+          }
+        }
+        activeCaptionText = `${currentIdx + 1}/${count} • ${slides[currentIdx].name.replace(/\.[^/.]+$/, '')}`;
+      }
+
+      // Optional Audio-Reactive Warm Edge Glow
+      if (state.audioReactive && bass > 0.05) {
+        const glowGrad = ctx.createRadialGradient(W * 0.5, H * 0.5, W * 0.25, W * 0.5, H * 0.5, W * 0.65);
+        glowGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        glowGrad.addColorStop(1, `rgba(251, 191, 36, ${Math.min(0.28, bass * 0.32)})`);
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Optional Particle / Atmosphere Overlay
+      drawOverlayEffects(safeTime, bass);
+
+      // Optional Cinematic Vignette
+      if (state.showVignette) {
+        const vig = ctx.createRadialGradient(W * 0.5, H * 0.5, W * 0.34, W * 0.5, H * 0.5, W * 0.68);
+        vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        vig.addColorStop(1, 'rgba(2, 4, 9, 0.58)');
+        ctx.fillStyle = vig;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Optional Visualizer
+      if (state.showVisualizer && analyserNode) {
+        analyserNode.getByteFrequencyData(freqData);
+        ctx.save();
+        for (let i = 0; i < 36; i++) {
+          const val = freqData[i] / 255;
+          const bh = Math.max(4, val * 68);
+          ctx.fillStyle = `rgba(251, 191, 36, ${0.4 + val * 0.5})`;
+          ctx.fillRect(96 + i * 11, H - 72 - bh, 6, bh);
+        }
+        ctx.restore();
+      }
+
+      // Optional Image Filename Counter on Video
+      if (state.showCaption && activeCaptionText) {
+        ctx.save();
+        ctx.font = '500 24px system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 10;
+        ctx.textAlign = 'right';
+        ctx.fillText(activeCaptionText, W - 72, H - 64);
+        ctx.restore();
+      }
+
+      // Optional Custom Song Title / Text Overlay on Video
+      if (state.overlayText.trim().length > 0) {
+        ctx.save();
+        ctx.font = '600 32px system-ui, sans-serif';
+        ctx.fillStyle = '#fef3c7';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 14;
+        ctx.fillText(state.overlayText.trim(), 96, H - 88);
+        ctx.restore();
+      }
+    }
+
+    let startTime = performance.now();
+    let playStartTime = null;
+    let playElapsedSec = 0;
+
+    function tick(now) {
+      requestAnimationFrame(tick);
+      const elapsed = Math.max(0, (now - startTime) / 1000);
+      renderScene(elapsed);
+
+      if (playStartTime !== null && !audioElement.paused) {
+        playElapsedSec = Math.max(0, (now - playStartTime) / 1000);
+        audioTimeDisplay.textContent = `${formatTime(playElapsedSec)} / ${formatTime(state.durationSec)} (Vald looplängd)`;
+        if (playElapsedSec >= state.durationSec) {
+          audioElement.pause();
+          audioElement.currentTime = 0;
+          playStartTime = null;
+          playElapsedSec = 0;
+          btnPlayAudio.textContent = '▶';
+        }
+      }
+    }
+
+    // =========================================================================
+    // UI Controls & Event Listeners
+    // =========================================================================
+    const rngDurationMinutes = document.getElementById('rngDurationMinutes');
+    const valDurationMinutes = document.getElementById('valDurationMinutes');
+    const btnMatchMp3 = document.getElementById('btnMatchMp3');
+    const recBtnText = document.getElementById('recBtnText');
+    const btnLoopText = document.getElementById('btnLoopText');
+    const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+    const btnPlayAudio = document.getElementById('btnPlayAudio');
+
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) return '00:00';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateDurationUI(seconds, labelStr) {
+      state.durationSec = seconds;
+      valDurationMinutes.textContent = labelStr;
+      recBtnText.textContent = `Spela in Video + MP3 (${labelStr})`;
+      btnLoopText.textContent = `🔁 Exportera Utan Ljud (${labelStr})`;
+      audioTimeDisplay.textContent = `${formatTime(playElapsedSec)} / ${formatTime(state.durationSec)} (Vald looplängd)`;
+    }
+
+    rngDurationMinutes.addEventListener('input', (e) => {
+      const mins = parseInt(e.target.value, 10);
+      updateDurationUI(mins * 60, `${mins} min`);
+    });
+
+    btnMatchMp3.addEventListener('click', () => {
+      const dur = (audioElement.duration && isFinite(audioElement.duration)) ? audioElement.duration : 669.6;
+      const approxMin = Math.max(1, Math.min(20, Math.round(dur / 60)));
+      rngDurationMinutes.value = approxMin;
+      updateDurationUI(dur, formatTime(dur));
+    });
+
+    // Intro / Start Image Controls
+    const introImageInput = document.getElementById('introImageInput');
+    const rngIntroSec = document.getElementById('rngIntroSec');
+    const valIntroSec = document.getElementById('valIntroSec');
+    const introThumbBox = document.getElementById('introThumbBox');
+    const introFileName = document.getElementById('introFileName');
+    const introSubStatus = document.getElementById('introSubStatus');
+    const btnClearIntro = document.getElementById('btnClearIntro');
+    const btnRestartFromIntro = document.getElementById('btnRestartFromIntro');
+
+    rngIntroSec.addEventListener('input', (e) => {
+      state.introDurationSec = parseFloat(e.target.value);
+      valIntroSec.textContent = `${state.introDurationSec.toFixed(1)} sek`;
+      if (state.introSlide) {
+        introSubStatus.textContent = `Visas i ${state.introDurationSec.toFixed(1)}s i början, sedan loop`;
+      }
+      updateCycleSummary();
+    });
+
+    introImageInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = reject;
+          el.src = url;
+        });
+        state.introSlide = { name: file.name, img, thumbUrl: url };
+        introThumbBox.innerHTML = `<img src="${url}" alt="Startbild" class="w-full h-full object-cover" />`;
+        introFileName.textContent = file.name;
+        introFileName.classList.replace('text-slate-300', 'text-emerald-300');
+        introSubStatus.textContent = `Visas i ${state.introDurationSec.toFixed(1)}s i början, sedan loop`;
+        btnClearIntro.classList.remove('hidden');
+        // Restart preview from 00:00 so user immediately sees the chosen start image
+        startTime = performance.now();
+        updateCycleSummary();
+      } catch (err) {
+        console.warn('Kunde inte ladda startbild:', file.name);
+      }
+    });
+
+    btnClearIntro.addEventListener('click', () => {
+      state.introSlide = null;
+      introImageInput.value = '';
+      introThumbBox.innerHTML = 'Ingen';
+      introFileName.textContent = 'Ingen startbild vald';
+      introFileName.classList.replace('text-emerald-300', 'text-slate-300');
+      introSubStatus.textContent = 'Filmen startar direkt med Bild 1';
+      btnClearIntro.classList.add('hidden');
+      startTime = performance.now();
+      updateCycleSummary();
+    });
+
+    btnRestartFromIntro.addEventListener('click', () => {
+      startTime = performance.now();
+      if (!audioElement.paused) {
+        audioElement.currentTime = 0;
+        playStartTime = performance.now();
+        playElapsedSec = 0;
+      }
+    });
+
+    // Slide Duration (Default 5s)
+    document.getElementById('rngSlideSec').addEventListener('input', (e) => {
+      state.slideDurationSec = parseFloat(e.target.value);
+      document.getElementById('valSlideSec').textContent = `${state.slideDurationSec.toFixed(1)} sek`;
+      updateCycleSummary();
+    });
+
+    document.getElementById('rngTransSec').addEventListener('input', (e) => {
+      state.transitionSec = parseFloat(e.target.value);
+      document.getElementById('valTransSec').textContent = `${state.transitionSec.toFixed(1)} sek`;
+    });
+
+    document.getElementById('rngKenBurns').addEventListener('input', (e) => {
+      state.kenBurnsAmount = parseInt(e.target.value, 10) / 100;
+      document.getElementById('valKenBurns').textContent = `${e.target.value}%`;
+    });
+
+    document.getElementById('selTransition').addEventListener('change', (e) => state.transitionType = e.target.value);
+    document.getElementById('selFitMode').addEventListener('change', (e) => state.fitMode = e.target.value);
+    document.getElementById('selOverlayEffect').addEventListener('change', (e) => state.overlayEffect = e.target.value);
+    document.getElementById('chkAudioReactive').addEventListener('change', (e) => state.audioReactive = e.target.checked);
+    document.getElementById('chkVignette').addEventListener('change', (e) => state.showVignette = e.target.checked);
+    document.getElementById('chkShowCounter').addEventListener('change', (e) => state.showCaption = e.target.checked);
+    document.getElementById('chkShowVisualizer').addEventListener('change', (e) => state.showVisualizer = e.target.checked);
+    document.getElementById('inpOverlayText').addEventListener('input', (e) => state.overlayText = e.target.value);
+
+    // Folder & Image Inputs
+    document.getElementById('folderInput').addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        loadFilesIntoSlides(e.target.files);
+      }
+    });
+
+    document.getElementById('imagesInput').addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        loadFilesIntoSlides(e.target.files);
+      }
+    });
+
+    // Drag & Drop support on the page
+    const dropZone = document.getElementById('dropZone');
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-amber-400');
+    });
+    window.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-amber-400');
+    });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-amber-400');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        loadFilesIntoSlides(e.dataTransfer.files);
+      }
+    });
+
+    document.getElementById('btnSortName').addEventListener('click', sortSlidesNaturally);
+    document.getElementById('btnShuffle').addEventListener('click', shuffleSlides);
+
+    // Audio Input & MP3 Duration Matching
+    let currentMp3BaseName = 'Neon After Rain (Extended Version)';
+    const audioInput = document.getElementById('audioInput');
+    const audioFileName = document.getElementById('audioFileName');
+
+    document.getElementById('chkLoopAudio').addEventListener('change', (e) => {
+      audioElement.loop = e.target.checked;
+    });
+
+    audioInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      currentMp3BaseName = file.name.replace(/\.[^/.]+$/, '').trim() || 'bildspel-video';
+      initAudioGraph();
+      audioElement.src = URL.createObjectURL(file);
+      audioFileName.textContent = `🎵 ${file.name}`;
+      audioElement.onloadedmetadata = () => {
+        const dur = audioElement.duration;
+        btnMatchMp3.textContent = `🎯 Matcha exakt MP3-längd (${formatTime(dur)})`;
+        if (document.getElementById('chkAutoMatchMp3').checked && isFinite(dur) && dur > 0) {
+          const approxMin = Math.max(1, Math.min(20, Math.round(dur / 60)));
+          rngDurationMinutes.value = approxMin;
+          updateDurationUI(dur, formatTime(dur));
+        } else {
+          audioTimeDisplay.textContent = `00:00 / ${formatTime(state.durationSec)} (Vald looplängd)`;
+        }
+      };
+    });
+
+    audioElement.addEventListener('loadedmetadata', () => {
+      audioTimeDisplay.textContent = `00:00 / ${formatTime(state.durationSec)} (Vald looplängd)`;
+      btnMatchMp3.textContent = `🎯 Matcha exakt MP3-längd (${formatTime(audioElement.duration)})`;
+    });
+
+    btnPlayAudio.addEventListener('click', async () => {
+      initAudioGraph();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      if (audioElement.paused) {
+        playStartTime = performance.now() - playElapsedSec * 1000;
+        startTime = performance.now() - playElapsedSec * 1000;
+        await audioElement.play();
+        btnPlayAudio.textContent = '⏸';
+      } else {
+        audioElement.pause();
+        btnPlayAudio.textContent = '▶';
+      }
+    });
+
+    // =========================================================================
+    // 1080p Video + MP3 Recording Engine
+    // =========================================================================
+    const btnRecordWithAudio = document.getElementById('btnRecordWithAudio');
+    const btnRecordLoop = document.getElementById('btnRecordLoop');
+    const recOverlay = document.getElementById('recOverlay');
+    const recStatusTitle = document.getElementById('recStatusTitle');
+    const recStatusTimer = document.getElementById('recStatusTimer');
+
+    let activeRecorder = null;
+    let recordedChunks = [];
+    let recTimerInterval = null;
+
+    function getSupportedMimeType() {
+      const candidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4;codecs=avc1.640028,mp4a.40.2',
+        'video/mp4;codecs=avc1.42E028,mp4a.40.2'
+      ];
+      for (const mime of candidates) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(mime)) return mime;
+      }
+      return '';
+    }
+
+    async function startRecording(withAudioMode) {
+      if (activeRecorder && activeRecorder.state === 'recording') {
+        stopRecording();
+        return;
+      }
+
+      document.getElementById('downloadResultBox').classList.add('hidden');
+      const canvasStream = canvas.captureStream(30);
+      const combinedTracks = [...canvasStream.getVideoTracks()];
+      const targetDuration = state.durationSec;
+
+      // Reset slideshow to Bild 1 at start of recording
+      startTime = performance.now();
+
+      if (withAudioMode && audioElement.src) {
+        initAudioGraph();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        audioElement.currentTime = 0;
+        playStartTime = performance.now();
+        playElapsedSec = 0;
+        await audioElement.play();
+        btnPlayAudio.textContent = '⏸';
+        const audioTracks = mediaStreamDest.stream.getAudioTracks();
+        if (audioTracks.length > 0) combinedTracks.push(audioTracks[0]);
+        recStatusTitle.textContent = 'Spelar in 1080p Bildspel + MP3 (Klicka på Stopp när du vill spara)...';
+      } else {
+        recStatusTitle.textContent = 'Spelar in 1080p Bildspelsloop (Klicka på Stopp när du vill spara)...';
+      }
+
+      const finalStream = new MediaStream(combinedTracks);
+      const mimeType = getSupportedMimeType();
+      const options = mimeType ? { mimeType, videoBitsPerSecond: 10_000_000 } : { videoBitsPerSecond: 10_000_000 };
+
+      recordedChunks = [];
+      activeRecorder = new MediaRecorder(finalStream, options);
+
+      activeRecorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) recordedChunks.push(ev.data);
+      };
+
+      activeRecorder.onstop = () => {
+        clearInterval(recTimerInterval);
+        recOverlay.classList.add('hidden');
+        recBtnText.textContent = `Spela in Video + MP3 (${valDurationMinutes.textContent})`;
+        btnRecordWithAudio.classList.remove('bg-red-500', 'hover:bg-red-400', 'text-white');
+        btnRecordWithAudio.classList.add('bg-amber-500', 'hover:bg-amber-400', 'text-slate-950');
+
+        const blob = new Blob(recordedChunks, { type: mimeType || 'video/webm' });
+        const ext = (mimeType && mimeType.includes('mp4')) ? 'mp4' : 'webm';
+        const fileName = `${currentMp3BaseName}.${ext}`;
+
+        const blobUrl = URL.createObjectURL(blob);
+        const dlBox = document.getElementById('downloadResultBox');
+        const dlLink = document.getElementById('downloadResultLink');
+        dlLink.href = blobUrl;
+        dlLink.download = fileName;
+        dlLink.textContent = `⬇ Ladda ner ${fileName}`;
+        dlBox.classList.remove('hidden');
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
+
+      activeRecorder.start(500);
+      recOverlay.classList.remove('hidden');
+      recBtnText.textContent = '⏹ Stoppa & Spara Video Nu';
+      btnRecordWithAudio.classList.remove('bg-amber-500', 'hover:bg-amber-400', 'text-slate-950');
+      btnRecordWithAudio.classList.add('bg-red-500', 'hover:bg-red-400', 'text-white');
+
+      const recStart = performance.now();
+      recTimerInterval = setInterval(() => {
+        const elapsed = (performance.now() - recStart) / 1000;
+        recStatusTimer.textContent = `${formatTime(elapsed)} / ${formatTime(targetDuration)}`;
+        if (elapsed >= targetDuration) {
+          stopRecording();
+        }
+      }, 200);
+    }
+
+    function stopRecording() {
+      if (activeRecorder && activeRecorder.state === 'recording') {
+        activeRecorder.stop();
+      }
+      if (!audioElement.paused) {
+        audioElement.pause();
+        btnPlayAudio.textContent = '▶';
+      }
+    }
+
+    btnRecordWithAudio.addEventListener('click', () => startRecording(true));
+    btnRecordLoop.addEventListener('click', () => startRecording(false));
+
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      const container = document.getElementById('canvasContainer');
+      if (!document.fullscreenElement) container.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
+    });
+
+    // Initialize Demo Slides & Start Animation Loop
+    createDemoSlides();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

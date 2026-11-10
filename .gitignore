@@ -1,0 +1,7 @@
+# Genererade videofiler och lokala bildmappar
+*.mp4
+*.webm
+Rain/
+__pycache__/
+.DS_Store
+Thumbs.db
